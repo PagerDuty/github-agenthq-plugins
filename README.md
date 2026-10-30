@@ -19,8 +19,9 @@ PagerDuty's operational intelligence plugin for the [GitHub Copilot](https://git
 
 - A working [GitHub Copilot CLI](https://docs.github.com/copilot) installation
 - A PagerDuty API token, exposed to the harness as `COPILOT_MCP_PAGERDUTY_API_KEY` (see [Where to get a token](#where-to-get-a-pagerduty-api-token))
+- Access to the PagerDuty-hosted [MCP server](https://docs.pagerduty.com/ai-automation/advance/pagerduty-mcp-server) (`https://mcp.pagerduty.com/mcp`), which the plugin configures automatically
 - For `create-pagerduty-skill`: enrollment in both [PagerDuty Skills EA](https://www.pagerduty.com/early-access/) and PagerDuty Advance MCP/API EA
-- For `investigate`: access to PagerDuty Advance MCP (`PAGERDUTY_API_KEY` must grant Advance access)
+- For `investigate`: access to PagerDuty Advance MCP (`COPILOT_MCP_PAGERDUTY_API_KEY` must grant Advance access)
 
 ## Install
 
@@ -114,7 +115,7 @@ The skill resolves your repo to a PagerDuty service through a fallback chain (ex
 
 ## Authentication
 
-All skills authenticate to PagerDuty via `PAGERDUTY_API_KEY`. The token is passed as `Authorization: Token token=${PAGERDUTY_API_KEY}` on every MCP request.
+All skills authenticate to PagerDuty via `COPILOT_MCP_PAGERDUTY_API_KEY`. The token is passed as `Authorization: Token token=${COPILOT_MCP_PAGERDUTY_API_KEY}` on every MCP request.
 
 ### Where to get a PagerDuty API token
 

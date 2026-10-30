@@ -21,7 +21,7 @@ Carry `BRANCH_MODE` and `BASE_BRANCH` forward through all subsequent steps.
 
 ### 0a: Verify PagerDuty MCP connectivity
 
-Call `pagerduty-list_services` with `query: "test"`. This is a connectivity check.
+Call `pagerduty-browse_services` with `action: "list"`, `query: "test"`, and `limit: 1`. This is a connectivity check.
 
 If the call returns a transport, auth, or "tool not found" error, STOP and tell the user:
 
@@ -92,7 +92,7 @@ Determine the PagerDuty service ID for this repository. Follow the steps **in or
 
 If the user passed a service name or ID with the invocation (the cleaned value from Step 0a-pre, after stripping `--branch` if present), use it immediately — **do not check the cache or catalog first**.
 
-Call `pagerduty-list_services` with the user-supplied value as the query.
+Call `pagerduty-browse_services` with `action: "list"` and the user-supplied value as the `query`.
 
 - Exactly one match → use it and skip to Step 1d.
 - Multiple matches → list them numbered to the user, ask which one, then proceed.
@@ -100,7 +100,7 @@ Call `pagerduty-list_services` with the user-supplied value as the query.
 
 ### 1b: Check cached configuration
 
-If no explicit argument was provided, read `.pagerduty/pagerduty-risk-config.json` via `view`. If it exists and contains `pagerduty.serviceId`, validate it by calling `pagerduty-get_service` with that ID.
+If no explicit argument was provided, read `.pagerduty/pagerduty-risk-config.json` via `view`. If it exists and contains `pagerduty.serviceId`, validate it by calling `pagerduty-browse_services` with `action: "get"` and that ID as `service_id`.
 
 - Call succeeds → use the service, display its name to the user, and skip to Step 2.
 - Call fails (service not found or API error) → discard the cached config, warn the user, and continue to Step 1c.
@@ -109,17 +109,17 @@ If no explicit argument was provided, read `.pagerduty/pagerduty-risk-config.jso
 
 Check for `catalog-info.yaml` in the repository root using `view`. Look for the `pagerduty.com/service-id` annotation under `metadata.annotations`. If found, use that service ID.
 
-Validate by calling `pagerduty-get_service` with the literal service ID (e.g. `PAWX771`). **Do NOT pass the ID to `pagerduty-list_services`** — querying by raw UUID returns a 502. Extract the service name from the response. If found, skip to Step 1d.
+Validate by calling `pagerduty-browse_services` with `action: "get"` and the literal service ID as `service_id` (e.g. `PAWX771`). **Do NOT pass the ID as the `query` of a `list` call** — querying by raw UUID returns a 502. Extract the service name from the response. If found, skip to Step 1d.
 
 ### 1d: Auto-detect from repository name
 
 If none of the above resolved a service:
 
 - Get the repository name from the current directory basename, or parse it from `git remote -v` output.
-- Call `pagerduty-list_services` with a query matching the repository name.
+- Call `pagerduty-browse_services` with `action: "list"` and a `query` matching the repository name.
 - Exactly one match → use it. Tell the user which service was detected and ask them to confirm before proceeding.
 - Multiple matches → list them numbered, ask the user to pick.
-- No match → ask the user for the PagerDuty service name or ID directly. Validate the response with `pagerduty-list_services`.
+- No match → ask the user for the PagerDuty service name or ID directly. Validate the response with `pagerduty-browse_services` (`action: "list"` for a name, `action: "get"` for an ID).
 
 ### 1e: Persist configuration
 
@@ -139,12 +139,13 @@ Otherwise, once a service ID is resolved, write `.pagerduty/pagerduty-risk-confi
 
 ## Step 2: Check ongoing incidents
 
-Call `pagerduty-list_incidents` with:
+Call `pagerduty-browse_incidents` with:
 
+- `action`: `"list"`
 - `statuses`: `["triggered", "acknowledged"]`
 - `service_ids`: `["<serviceId>"]`
 
-For each active incident returned, call `pagerduty-list_incident_notes` for responder context. **Cap at 5 active incidents** — if more are returned, fetch notes only for the 5 most recently triggered and note the total count.
+For each active incident returned, call `pagerduty-browse_incidents` with `action: "list_notes"` and its `incident_id` for responder context. **Cap at 5 active incidents** — if more are returned, fetch notes only for the 5 most recently triggered and note the total count.
 
 If there are active incidents, report them prominently — they are the highest-priority risk signal:
 
@@ -164,15 +165,15 @@ If there are no active incidents, note that briefly and continue.
 
 **Run these calls in parallel with Step 2** — they are fully independent. Three calls in parallel:
 
-1. `pagerduty-list_incidents` for the service over the last 90 days, filtered to **high urgency** (`since` 90 days ago, `until` today, `urgencies: ["high"]`). Include all statuses.
+1. `pagerduty-browse_incidents` with `action: "list"` for the service over the last 90 days, filtered to **high urgency** (`since` 90 days ago, `until` today, `urgencies: ["high"]`). Include all statuses.
 
-   **Limit handling:** the API caps results at 1000 incidents. If exactly 1000 are returned, the history is partial — note this in the assessment and state the actual date range covered (timestamp of the oldest incident returned).
+   **Limit handling:** each call returns at most 100 incidents. If the response has `truncated: true`, call again with `offset` advanced by `limit`. Stop after 1000 incidents (10 pages); if you stop there, the history is partial — note this in the assessment and state the actual date range covered (timestamp of the oldest incident returned).
 
-2. `pagerduty-list_incidents` for the service over the last 90 days, filtered to **low urgency** (same date range, `urgencies: ["low"]`). Include all statuses. 
+2. `pagerduty-browse_incidents` with `action: "list"` for the service over the last 90 days, filtered to **low urgency** (same date range, `urgencies: ["low"]`). Include all statuses. 
 
     Apply the same limit handling as above independently for this call.
 
-3. `pagerduty-list_service_change_events` for the service. **Deduplicate** change events by `summary + timestamp` before analyzing — the API often returns 5–6 identical entries for the same deploy.
+3. `pagerduty-browse_change_events` with `action: "list_service"` and the service's `service_id`. **Deduplicate** change events by `summary + timestamp` before analyzing — the API often returns 5–6 identical entries for the same deploy.
 
 For incidents that warrant fetching notes, use the high-urgency list from call 1 directly — no keyword guessing. **Cap notes fetching at 10 incidents** (most recent first). If the high-urgency list has more than 10, note how many were skipped.
 

@@ -15,7 +15,7 @@ Parse by scanning for a time-unit pattern first; treat any remaining tokens as `
 
 Before doing anything else, verify PagerDuty connectivity.
 
-Call `pagerduty-list_services` with `query: "test"`. This is a connectivity check.
+Call `pagerduty-browse_services` with `action: "list"`, `query: "test"`, and `limit: 1`. This is a connectivity check.
 
 If the call returns a transport, auth, or "tool not found" error, STOP and tell the user:
 
@@ -36,9 +36,9 @@ Do NOT proceed without PagerDuty MCP.
 - Otherwise: resolve fresh from PagerDuty.
 
 **Resolve from PagerDuty (run in parallel where possible):**
-1. Call `pagerduty-get_user_data` to get the current user's email.
-2. Call `pagerduty-list_escalation_policies` to list policies. If `team_name` was provided, filter by name match. For each matching policy, call `pagerduty-get_escalation_policy` to get its schedules; for each schedule call `pagerduty-get_schedule` to retrieve `rotation_duration`.
-3. Call `pagerduty-list_services` filtered to current user.
+1. Call `pagerduty-browse_users` with `action: "get"` to get the current user's email and teams.
+2. Call `pagerduty-browse_escalation_policies` with `action: "list"` to list policies. If `team_name` was provided, pass it as `query` to filter by name match. For each matching policy, call `pagerduty-browse_escalation_policies` with `action: "get"` and `policy_id` to get its schedules; for each schedule call `pagerduty-browse_schedules` with `action: "get"` and `schedule_id` to retrieve `rotation_duration`.
+3. Call `pagerduty-browse_services` with `action: "list"` and `team_ids` set to the current user's team IDs from step 1.
 
 **Profile key:** use `team_name` if provided, otherwise the user's email.
 
@@ -63,9 +63,9 @@ Do not proceed to Step 2 until the user has confirmed scope and timeframe.
 
 Run all calls in parallel:
 
-1. **Active incidents** — call `pagerduty-list_incidents` with `statuses[]=triggered,acknowledged` scoped to the services in the resolved profile.
+1. **Active incidents** — call `pagerduty-browse_incidents` with `action: "list"`, `statuses: ["triggered", "acknowledged"]`, and `service_ids` set to the services in the resolved profile.
 
-2. **All incidents in window** — call `pagerduty-list_incidents` with `since`/`until` filters covering the timeframe, for the same service scope. Include all statuses.
+2. **All incidents in window** — call `pagerduty-browse_incidents` with `action: "list"` and `since`/`until` covering the timeframe, for the same `service_ids`. Omit `statuses` to include all statuses. If the response has `truncated: true`, call again with `offset` advanced by `limit` until it does not.
 
 3. **Stale check** — from call 1, flag any triggered incident open >7 days.
 
