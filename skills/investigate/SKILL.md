@@ -9,7 +9,7 @@ The user will provide an incident ID (e.g. `Q3AHWAR33KUK3G` or `#971097`), or as
 
 ## Pre-flight
 
-Call `pagerduty-list_incidents` with `limit=1` to confirm the PagerDuty MCP server is connected.
+Call `pagerduty-browse_incidents` with `action: "list"` and `limit: 1` to confirm the PagerDuty MCP server is connected.
 
 If the call fails with a transport, auth, or "tool not found" error, STOP and tell the user:
 
@@ -28,9 +28,9 @@ Parse the user's message:
 
 **Alphanumeric ID** (e.g. `Q3AHWAR33KUK3G`): use directly as `incident_id`. Skip to Step 2.
 
-**Numeric or `#`-prefixed** (e.g. `#971097`): strip `#`, call `pagerduty-list_incidents` and find the incident whose `incident_number` matches. Use its `id` field. If no match, ask the user to provide the alphanumeric ID directly.
+**Numeric or `#`-prefixed** (e.g. `#971097`): strip `#`, call `pagerduty-browse_incidents` with `action: "list"` and find the incident whose `incident_number` matches. Use its `id` field. If no match, ask the user to provide the alphanumeric ID directly.
 
-**No ID given**: call `pagerduty-list_incidents` with `status=[triggered,acknowledged]`. Show the first 10 results (ID, title, service, age) and ask which one to investigate. If empty, tell the user no active incidents were found and ask them to provide an incident ID or describe what they want to investigate.
+**No ID given**: call `pagerduty-browse_incidents` with `action: "list"` and `statuses: ["triggered", "acknowledged"]`. Show the first 10 results (ID, title, service, age) and ask which one to investigate. If empty, tell the user no active incidents were found and ask them to provide an incident ID or describe what they want to investigate.
 
 Do not call the SRE Agent until an incident ID is confirmed.
 
