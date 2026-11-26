@@ -2,15 +2,39 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-PagerDuty's operational intelligence plugin for the [GitHub Copilot](https://github.com/features/copilot) AgentHQ plugin system. Brings PagerDuty incident data and Skills management into your GitHub workflow.
+PagerDuty's operational intelligence plugin for the [GitHub Copilot](https://github.com/features/copilot) AgentHQ plugin system. Brings PagerDuty incident data into your GitHub workflow.
 
 [Install PagerDuty Github App](https://github.com/apps/pagerduty-agent-app)
+
+## Before you start: one-time admin step
+
+> **A PagerDuty account admin must install the GitHub Copilot CLI app once per PagerDuty account.** Until they do, nobody in the account can use this plugin.
+>
+> **[Install the GitHub Copilot CLI app in PagerDuty](https://app.pagerduty.com/oauth-apps/PEMCLUK)** (requires an account admin)
+
+If the app is not installed, sign-in fails *after* you log in, with an error saying the app is not installed in the account. Send the link above to your PagerDuty admin, then try again.
+
+With the admin step you do not need your own OAuth app. If Copilot CLI asks for a client ID, enter `https://github.com/copilot/cli/client-metadata.json`. See the [CIMD clients guide](https://docs.pagerduty.com/ai-automation/advance/pagerduty-mcp-server/cimd-clients) for details.
+
+### Can't get the app installed?
+
+Register your own OAuth app in PagerDuty and connect with its client ID and secret instead.
+
+1. Add the `pagerduty` MCP server yourself with Copilot CLI (HTTP transport):
+
+   ```bash
+   copilot mcp add --transport http pagerduty "https://mcp.pagerduty.com/mcp?tool_groups=full-tools,ai-agents"
+   ```
+
+2. When you authenticate, Copilot CLI asks for a client ID and client secret. Enter your app's.
+3. Copilot CLI uses a loopback redirect on a port it picks (for example `http://127.0.0.1:55453/`). Register that exact redirect URL, with the port Copilot shows, in your OAuth app. If the first sign-in fails with a redirect mismatch, copy the redirect URL Copilot used, add it to the app, and retry.
+
+See [Use an OAuth client ID and client secret](https://docs.pagerduty.com/ai-automation/advance/pagerduty-mcp-server#use-an-oauth-client-id-and-client-secret). Never commit the client secret to a repository.
 
 ## Capabilities
 
 | Skill | What it does |
 | --- | --- |
-| [`create-pagerduty-skill`](#create-pagerduty-skill) | Create or update PagerDuty skills for AI agents through guided interview |
 | [`investigate`](#investigate) | Multi-turn SRE Agent investigation for a PagerDuty incident |
 | [`on-call-handoff`](#on-call-handoff) | Generate an on-call incident summary or shift handoff using PagerDuty data |
 | [`pre-commit-risk-scoring`](#pre-commit-risk-scoring) | Assess pre-commit risk by correlating PagerDuty incidents with current code changes |
@@ -18,9 +42,9 @@ PagerDuty's operational intelligence plugin for the [GitHub Copilot](https://git
 ## Prerequisites
 
 - A working [GitHub Copilot CLI](https://docs.github.com/copilot) installation
-- A PagerDuty API token, exposed to the harness as `COPILOT_MCP_PAGERDUTY_API_KEY` (see [Where to get a token](#where-to-get-a-pagerduty-api-token))
-- For `create-pagerduty-skill`: enrollment in both [PagerDuty Skills EA](https://www.pagerduty.com/early-access/) and PagerDuty Advance MCP/API EA
-- For `investigate`: access to PagerDuty Advance MCP (`PAGERDUTY_API_KEY` must grant Advance access)
+- Access to the PagerDuty-hosted [MCP server](https://docs.pagerduty.com/ai-automation/advance/pagerduty-mcp-server) (`https://mcp.pagerduty.com/mcp?tool_groups=full-tools,ai-agents`), which the plugin configures automatically
+- A PagerDuty account admin has completed the [one-time admin step](#before-you-start-one-time-admin-step)
+- For `investigate`: PagerDuty Advance on your account
 
 ## Install
 
@@ -36,24 +60,6 @@ copilot plugin list                 # should list PagerDuty/github-agenthq-plugi
 /agent                              # confirms the PagerDuty main agent loaded
 /skills list                        # confirms all skills loaded
 ```
-
-## create-pagerduty-skill
-
-*Create or update PagerDuty Skills for the SRE Agent.*
-
-Ask the agent to create or update a PagerDuty Skill:
-
-> "Create a new PagerDuty skill"
-> "Update my `<skill-name>` skill"
-
-The skill walks you through:
-
-1. Create vs. update
-2. Scope selection (personal user vs. shared account)
-3. Workflow description in your own words
-4. Auto-drafted, structured instructions for the SRE Agent
-5. Name + description suggestions, validated against API constraints
-6. Immediate deployment to the PagerDuty platform
 
 ## investigate
 
@@ -72,7 +78,7 @@ The skill opens a multi-turn SRE Agent session:
 - Maintains session context across follow-up questions — deployment correlation, similar past incidents, log links — without reloading context each turn
 - Optionally saves the full conversation transcript to `./on-call-reports/sre-<id>_<date>.md`
 
-Requires PagerDuty Advance MCP access (see [Prerequisites](#prerequisites)).
+Requires PagerDuty Advance (see [Prerequisites](#prerequisites)).
 
 ## on-call-handoff
 
@@ -112,13 +118,22 @@ The skill resolves your repo to a PagerDuty service through a fallback chain (ex
 - Correlation findings between current changes and past incidents
 - A risk score (0 = no risk, 5 = critical) with recommendations
 
-## Authentication
+## Signing in
 
-All skills authenticate to PagerDuty via `PAGERDUTY_API_KEY`. The token is passed as `Authorization: Token token=${PAGERDUTY_API_KEY}` on every MCP request.
+The plugin configures one MCP server, `pagerduty`. Once your admin has completed the [one-time admin step](#before-you-start-one-time-admin-step), start Copilot CLI and sign in to PagerDuty when prompted (or connect `pagerduty` from `/mcp`). No API token, client ID, or client secret is needed.
 
-### Where to get a PagerDuty API token
+## Troubleshooting
 
-PagerDuty web UI → User Profile → User Settings → API Access → **Create API User Token**.
+| Symptom | Fix |
+| --- | --- |
+| Sign-in fails after login with an error that the app is not installed in the account | A PagerDuty account admin must [install the GitHub Copilot CLI app](https://app.pagerduty.com/oauth-apps/PEMCLUK) once, then sign in again. |
+| Copilot CLI asks for a client ID | Enter `https://github.com/copilot/cli/client-metadata.json`. |
+| `401` / unauthorized responses | Your session expired or was revoked. Re-authenticate the `pagerduty` MCP server. |
+| `429` rate limit | The PagerDuty API is rate limiting requests. Wait a minute and retry. |
+
+### Restricting scopes
+
+The GitHub Copilot CLI app requests all scopes. If your organization wants narrower scopes, register your own Scoped OAuth app and connect with it as described in [Can't get the app installed?](#cant-get-the-app-installed).
 
 ## Reporting issues
 

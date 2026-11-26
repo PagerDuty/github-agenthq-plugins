@@ -64,7 +64,7 @@ copilot plugin list
 # Non-interactive smoke check (enumerate loaded agents/skills/MCP servers)
 copilot -p "List loaded custom agents, plugin skills, and MCP server names." --allow-all
 
-# Run a skill end-to-end (requires PAGERDUTY_API_KEY in the environment)
+# Run a skill end-to-end (requires the "pagerduty" MCP server connected via OAuth)
 copilot -p "Run a pre-commit risk check on this branch against <service-name>"
 ```
 
